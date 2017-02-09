@@ -1,5 +1,4 @@
-<?xml version="1.0"?>
-<package>
+<?xml version="1.0"?><package>
   <name>tester</name>
   <version>0.0.0</version>
   <description>The tester package</description>
@@ -57,4 +56,4 @@
     <!-- Other tools can request additional information be placed here -->
 
   </export>
-</package>
+<build_depend>message_generation</build_depend><run_depend>message_runtime</run_depend></package>

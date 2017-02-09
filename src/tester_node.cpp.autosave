@@ -202,7 +202,10 @@ class tester
             }
             cn_ptr->publish_ROS(cnmap_pub_ptr);
          }
-
+         //if(cn_ptr != 0) cn_ptr->publish_ROS(cnmap_pub_ptr);
+         //read_write_vector();
+         //re_wr(); crash
+         //writetobag();
          ros::spinOnce();
          r.sleep();
          //readfrombag();
