@@ -101,7 +101,7 @@ catkin_package(
 
    CATKIN_DEPENDS donkey_rover pcl_analyser roscpp rospy std_msgs
    INCLUDE_DIRS include
-   LIBRARIES costmap
+   LIBRARIES costmap pathsolver
    DEPENDS system_lib
 )
 
@@ -113,14 +113,15 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include/${PROJECT_NAME}
   ${pcl_analyser_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS} 
 )
 
 ## Declare a C++ library
-# add_library(tester
-#   src/${PROJECT_NAME}/tester.cpp
-# )
+add_library(markerfilter
+   include/${PROJECT_NAME}/markerfilter.cpp
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -135,7 +136,11 @@ add_executable(tester_node src/tester_node.cpp)
 # add_dependencies(tester_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(tester_node ${pcl_analyser_LIBRARIES}
+target_link_libraries(markerfilter
+   ${catkin_LIBRARIES}
+ )
+
+target_link_libraries(tester_node markerfilter pathsolver
    ${catkin_LIBRARIES}
  )
 

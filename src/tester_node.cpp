@@ -5,7 +5,7 @@
 #include <pcl_analyser/cnmap.h>
 #include <pcl_analyser/costmap.h>
 #include <math.h>
-
+#include <tf/transform_listener.h>
 
 #include <iostream>
 #include <fstream>
@@ -18,6 +18,10 @@
 
 #include <std_msgs/Int32.h>
 #include <std_msgs/String.h>
+#include "markerfilter.h"
+//#include<pcl_analyser/RoverPath.h>
+#include <pcl_analyser/pathsolver.h>
+
 
 //read write
 #include <rosbag/bag.h>
@@ -31,6 +35,7 @@ char* str2char( std::string str ) {
   strcpy( c, str.c_str());
   return c;
 }
+
 class tester
 {
   public:
@@ -38,16 +43,18 @@ class tester
     tester(ros::NodeHandle& node)
     {
        n_=node;
-       cnmap_pub_ptr = new ros::Publisher(n_.advertise<nav_msgs::OccupancyGrid>("cnmap", 10));
+       cnmap_pub_ptr = new ros::Publisher(n_.advertise<nav_msgs::OccupancyGrid>("cnmap_tester", 10));
+       pose_p_pub = n_.advertise<geometry_msgs::PoseStamped> ("/pose_noise",1);
+       pose_f_pub = n_.advertise<geometry_msgs::PoseStamped> ("/pose_filtered",1);
        map_sub   = n_.subscribe("/map", 1, &tester::map_cb,this);
        //base_map_ptr = 0;
        cn_ptr = 0;
        new_map = false;
-       char* path = str2char(ros::package::getPath("tester") + "/conf/lookuptable.txt");
-       file_ptr = new std::fstream(path,std::ios::out | std::ios::in | std::ios::trunc | std::ios::binary);
        LP_msg_ptr = new pcl_analyser::Lookuptbl();
        bagptr = new rosbag::Bag();
 
+       //Filter
+       filter_ptr = new MarkerFilter("cam","base",0.5,10);
     }
 
     void map_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
@@ -55,70 +62,6 @@ class tester
       ROS_INFO("Map Received");
       map_msg_Ptr = msg;
       new_map = true;
-    }
-
-    void read_write_vector()
-    {
-       char* path = str2char(ros::package::getPath("tester") + "/conf/lookuptable.txt");
-       //std::ofstream myfile;
-       //myfile.open (str2char(path));
-       //myfile << "Writing this to a file.\n";
-       //myfile.close();
-       int myints[] = {16,2,77,29};
-       int newints[] = {};
-       std::vector<int> myVector(myints, myints + sizeof(myints) / sizeof(int) );
-       std::vector<int> newVector(newints, newints + sizeof(newints) / sizeof(int) );
-
-       //std::vector<std::vector<float> > myVector( 10, std::vector<float> ( 3, -12.78 ) );
-       //std::vector<std::vector<float> > newVector;
-
-
-       std::ofstream FILE(path,std::ios::out);//path,std::ios::out | std::ofstream::binary
-
-       std::copy(myVector.begin(),myVector.end(),std::ostreambuf_iterator<char>(FILE));
-       FILE.flush(); // required here
-
-
-       std::ifstream INFILE(path,std::ios::in);
-       std::istreambuf_iterator<char> iter(INFILE);
-
-       std::copy(iter,std::istreambuf_iterator<char>{},std::back_inserter(newVector));
-
-
-
-       for(int i=0; i< newVector.size();i++)
-           ROS_INFO_STREAM(newVector[i]);
-    }
-    void re_wr()
-    {
-        char* path = str2char(ros::package::getPath("tester") + "/conf/lookuptable.txt");
-        geometry_msgs::PoseArray p1,p2,p3;
-        p1.poses = std::vector< geometry_msgs::Pose > (3);
-        p2.poses = std::vector< geometry_msgs::Pose > (3);
-        p3.poses = std::vector< geometry_msgs::Pose > (3);
-        p1.header.frame_id = "helllo";
-        p1.poses[0].position.x = 0.3;
-        p2.poses[1].position.y = -1.0;
-        p3.poses[2].position.z = 6.2;
-
-        std::map <size_t,geometry_msgs::PoseArray> LP,LPnew; //lookuptable
-        LP[1] = p1;
-        LP[2] = p2;
-        LP[3] = p3;
-
-        //std::fstream FILE(path,std::ios::out | std::ios::in | std::ios::trunc | std::ios::binary );//path,std::ios::out | std::ofstream::binary
-        if(!file_ptr->is_open())
-        {
-          ROS_ERROR("error reading the file");
-          return;
-        }
-
-        file_ptr->write((char *)&LP,sizeof(std::map <size_t,geometry_msgs::PoseArray>));
-        file_ptr->seekg(0);
-        file_ptr->read((char *)&LPnew,sizeof(std::map <size_t,geometry_msgs::PoseArray>));
-
-        ROS_WARN_STREAM(LPnew[1].header.frame_id);
-
     }
 
 
@@ -202,24 +145,100 @@ class tester
             }
             cn_ptr->publish_ROS(cnmap_pub_ptr);
          }
+         //if(cn_ptr != 0) cn_ptr->publish_ROS(cnmap_pub_ptr);
 
          ros::spinOnce();
          r.sleep();
-         //readfrombag();
        }
+    }
+
+    void test_cnmap()
+    {
+      rate = 10.0;
+      ros::Rate r(rate);
+      cnmap cn(&n_,"/map",10,false);
+
+      ros::Time t1,t2;
+      t1 = ros::Time::now();
+      while(n_.ok())
+      {
+         t2 = ros::Time::now();
+         cn.publish_ROS();
+
+         if((t2-t1).toSec()>3)
+         {
+           cn.set_home(1.0,2.0);
+           cn.update();
+           //cn.find_discovered(10,3);
+           cn.find_discovered(2,10);
+           t1 = t2;
+         }
+         ros::spinOnce();
+         r.sleep();
+      }
+    }
+    double rand_noise()
+    {
+      int n = 120 - (rand() % 40);
+      return n/100.0;
+    }
+    void test_filter()
+    {
+      ros::Rate r(10);
+      int n = rand() % 20;
+      geometry_msgs::PoseStamped p_base,p_noise,p_filtered;
+      p_base.pose.position.x = 2.0;
+      p_base.pose.position.y = 0.2;
+      double p_b_roll, p_b_pitch,p_b_yaw;
+      p_b_roll = 0.0;
+      p_b_pitch = -0.7;
+      p_b_yaw = 0.4;
+      p_base.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(p_b_roll,p_b_pitch,p_b_yaw);
+      p_noise = p_base;
+      p_noise.header.frame_id = "cam";
+      p_base.header.frame_id = "cam";
+      p_filtered = p_base;
+      //filter_ptr->Debug_mode();
+      while(ros::ok())
+      {
+        p_noise.pose.position.x = p_base.pose.position.x;//*rand_noise();
+        p_noise.pose.position.y = p_base.pose.position.y;//*rand_noise();
+        p_noise.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(p_b_roll,p_b_pitch*rand_noise(),p_b_yaw);
+        p_noise.header.stamp = ros::Time::now();
+        p_base.header.stamp = ros::Time::now();
+        pose_p_pub.publish(p_noise);
+        filter_ptr->set_v1(p_noise);
+        geometry_msgs::PoseStamped filter_pose;
+        double lin_var,ang_var;
+        if(filter_ptr->getPose1(filter_pose,lin_var,ang_var))
+        {
+          ROS_INFO("lin_var:%f   ang_var:%f",lin_var,ang_var);
+          pose_f_pub.publish(filter_pose);
+        }
+        r.sleep();
+        ros::spinOnce();
+      }
+    }
+
+    void test_path_solver()
+    {
+      ps_ptr = new pathsolver(&n_,"global_costmap","elevation_grid_",0.0,3.00,50,"pcl_analyser_node");
+      ps_ptr->test();
     }
 
 protected:
   /*state here*/
   ros::NodeHandle n_;
-  std::fstream* file_ptr;
   pcl_analyser::Lookuptbl* LP_msg_ptr;
   rosbag::Bag *bagptr;
   // Subscribers
-  ros::Subscriber map_sub;
 
+  ros::Subscriber map_sub;
+  MarkerFilter* filter_ptr;
   // Publishers
   ros::Publisher *cnmap_pub_ptr;
+  ros::Publisher pose_p_pub;
+  ros::Publisher pose_f_pub;
   double rate;
 
 private:
@@ -227,7 +246,7 @@ private:
   cnmap   *cn_ptr;
   nav_msgs::OccupancyGrid::ConstPtr map_msg_Ptr;
   bool new_map;
-
+  pathsolver* ps_ptr;
 
 };
 
@@ -237,6 +256,9 @@ int main(int argc, char **argv)
   ros::NodeHandle node;
 
   tester tt(node);
-  tt.handle();
+  //tt.handle();
+  //tt.test_cnmap();
+  //tt.test_filter();
+  tt.test_path_solver();
   return 0;
 }

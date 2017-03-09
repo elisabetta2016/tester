@@ -1,0 +1,12 @@
+deflogin on
+autodetach on
+
+escape ^oo
+
+caption always
+
+screen 0
+title "fake TF"
+stuff "rosrun tf static_transform_publisher 0.5 0 1 0 0.7 0 base cam 100\015"
+
+
