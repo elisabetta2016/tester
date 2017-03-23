@@ -1,0 +1,14 @@
+deflogin on
+autodetach on
+
+escape ^oo
+
+caption always
+
+screen 0
+title "ROS Master"
+stuff "roscore\015"
+
+screen 1
+title "fake map"
+

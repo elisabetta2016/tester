@@ -130,7 +130,7 @@ add_library(markerfilter
 
 ## Declare a C++ executable
 add_executable(tester_node src/tester_node.cpp)
-
+add_executable(approach src/approach.cpp)
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(tester_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -139,6 +139,10 @@ add_executable(tester_node src/tester_node.cpp)
 target_link_libraries(markerfilter
    ${catkin_LIBRARIES}
  )
+
+target_link_libraries(approach pathsolver
+    ${catkin_LIBRARIES}
+    )
 
 target_link_libraries(tester_node markerfilter pathsolver
    ${catkin_LIBRARIES}

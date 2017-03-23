@@ -47,6 +47,8 @@ class tester
        pose_p_pub = n_.advertise<geometry_msgs::PoseStamped> ("/pose_noise",1);
        pose_f_pub = n_.advertise<geometry_msgs::PoseStamped> ("/pose_filtered",1);
        map_sub   = n_.subscribe("/map", 1, &tester::map_cb,this);
+       costmap_sub = n_.subscribe("/global_costmap",1,&tester::costmap_cb,this);
+       inf_costmap_pub = n_.advertise<nav_msgs::OccupancyGrid>("inflated_costmap",1);
        //base_map_ptr = 0;
        cn_ptr = 0;
        new_map = false;
@@ -55,6 +57,23 @@ class tester
 
        //Filter
        filter_ptr = new MarkerFilter("cam","base",0.5,10);
+       master_grid_ptr = 0;
+    }
+
+    void costmap_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+    {
+      if(master_grid_ptr == 0)
+      {
+        master_grid_ptr = new costmap(*msg,false);
+      }
+      else
+      {
+        master_grid_ptr->resetMap();
+        master_grid_ptr->UpdateFromMap(*msg);
+        master_grid_ptr->inflate(0.2,0.1);
+        inf_costmap_pub.publish(master_grid_ptr->getROSmsg());
+
+      }
     }
 
     void map_cb(const nav_msgs::OccupancyGrid::ConstPtr& msg)
@@ -222,7 +241,7 @@ class tester
 
     void test_path_solver()
     {
-      ps_ptr = new pathsolver(&n_,"global_costmap","elevation_grid_",0.0,3.00,50,"pcl_analyser_node");
+      ps_ptr = new pathsolver(&n_,"global_costmap","elevation_costmap",0.0,3.00,50,"pcl_analyser_node");
       ps_ptr->test();
     }
 
@@ -232,13 +251,15 @@ protected:
   pcl_analyser::Lookuptbl* LP_msg_ptr;
   rosbag::Bag *bagptr;
   // Subscribers
-
+  ros::Subscriber costmap_sub;
   ros::Subscriber map_sub;
   MarkerFilter* filter_ptr;
   // Publishers
   ros::Publisher *cnmap_pub_ptr;
+  ros::Publisher inf_costmap_pub;
   ros::Publisher pose_p_pub;
   ros::Publisher pose_f_pub;
+  costmap* master_grid_ptr;
   double rate;
 
 private:
