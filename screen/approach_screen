@@ -6,9 +6,25 @@ escape ^oo
 caption always
 
 screen 0
-title "ROS Master"
-stuff "roscore\015"
+title "Donkey Hector"
+stuff "rosnode kill /rover_odom;sleep 0.1;roslaunch donkey_rover donkey_hector.launch\015"
 
 screen 1
-title "fake map"
+title "pc_maker"
+stuff "sleep 1;roslaunch pc_maker pointCloud_window.launch\015"
 
+screen 2
+title "Obstacle detection"
+stuff "sleep 1;roslaunch pcl_analyser pso.launch\015"
+
+screen 3
+title "Elevation Map"
+stuff "sleep 1;roslaunch hector_elevation_visualization donkey_elevation.launch\015"
+
+screen 4
+title "RVIZ"
+stuff "sleep 2;rviz -d /home/sherpa/catkin_ws/src/tester/conf/approach.rviz\015"
+
+screen 5
+title "Approach node"
+stuff "sleep 2;rosrun tester approach\015"
